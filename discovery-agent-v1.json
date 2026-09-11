@@ -1,0 +1,316 @@
+{
+  "name": "P-DISCOVERY-SEA — Agent Prospection Agences Performance",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "da001111-0001-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Trigger Manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 8 requêtes ciblées agences SEA/performance France\n// site:linkedin.com/in = Google cherche dans les profils LinkedIn publics (pas de scraping LinkedIn)\nreturn [\n  { json: { query: 'site:linkedin.com/in \"fondateur\" \"agence Google Ads\" France -freelance', label: 'Google Ads' } },\n  { json: { query: 'site:linkedin.com/in \"CEO\" OR \"co-fondateur\" \"agence SEA\" France -freelance', label: 'SEA' } },\n  { json: { query: 'site:linkedin.com/in \"fondateur\" \"agence performance\" \"Google Ads\" France', label: 'Performance' } },\n  { json: { query: 'site:linkedin.com/in \"fondateur\" \"Meta Ads\" OR \"Facebook Ads\" agence France -freelance', label: 'Meta Ads' } },\n  { json: { query: 'site:linkedin.com/in \"fondateur\" \"paid social\" agence France -freelance', label: 'Paid Social' } },\n  { json: { query: 'site:linkedin.com/in \"fondateur\" \"Google Premier Partner\" agence France', label: 'Premier Partner' } },\n  { json: { query: 'site:linkedin.com/in \"fondateur\" \"agence acquisition\" OR \"lead generation\" \"Google Ads\" France', label: 'Acquisition' } },\n  { json: { query: 'site:linkedin.com/in \"fondateur\" \"media buying\" OR \"achat media\" agence France -freelance', label: 'Media Buying' } }\n];"
+      },
+      "id": "da001111-0002-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Générer requêtes SEA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "da001111-0003-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Boucle requêtes",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-KEY", "value": "REMPLACER_PAR_CLE_SERPER" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ q: $json.query, num: 10, gl: 'fr', hl: 'fr' }) }}"
+      },
+      "id": "da001111-0004-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Chercher LinkedIn (Serper)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "da001111-0004b-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Pause anti-spam",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1020, 300],
+      "webhookId": "pause-serper"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrait les profils LinkedIn des résultats Serper\n// Accumule dans staticData pour collecter sur toutes les requêtes\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.allProfiles) staticData.allProfiles = [];\n\nconst data = $input.item.json;\nconst results = data.organic || [];\nconst label = $('Boucle requêtes').item.json.label || 'search';\n\nfor (const r of results) {\n  const title = r.title || '';\n  const link = r.link || '';\n  const snippet = r.snippet || '';\n\n  // Garder uniquement les URLs linkedin.com/in (profils personnels)\n  if (!link.includes('linkedin.com/in')) continue;\n\n  // Parsing du titre Google : \"Prénom Nom - Poste - Agence | LinkedIn\"\n  const parts = title.split(' - ');\n  const nom = parts[0]?.trim() || '';\n  const poste = parts[1]?.trim() || '';\n  let agence = parts[2]?.replace(/\\|.*$/, '').trim() || '';\n\n  // Ignorer si pas de nom ou trop court\n  if (!nom || nom.length < 3) continue;\n\n  // Ignorer les mots-clés IA/automation dans le snippet\n  const blacklist = ['automatisation', 'no-code', 'make.com', 'zapier', 'n8n', 'automation agency'];\n  const snippetLower = snippet.toLowerCase();\n  if (blacklist.some(w => snippetLower.includes(w))) continue;\n\n  staticData.allProfiles.push({\n    nom,\n    poste,\n    agence,\n    linkedin_url: link,\n    snippet: snippet.substring(0, 200),\n    source: label\n  });\n}\n\nconsole.log(`Profils accumulés : ${staticData.allProfiles.length}`);\nreturn [{ json: { profils_accumules: staticData.allProfiles.length } }];"
+      },
+      "id": "da001111-0005-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Extraire et accumuler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Récupère tous les profils accumulés, déduplique par URL LinkedIn\nconst staticData = $getWorkflowStaticData('global');\nconst all = staticData.allProfiles || [];\nstaticData.allProfiles = []; // reset pour la prochaine exécution\n\nconst seen = new Set();\nconst unique = all.filter(p => {\n  if (!p.linkedin_url || seen.has(p.linkedin_url)) return false;\n  seen.add(p.linkedin_url);\n  return true;\n});\n\nconsole.log(`Profils uniques après déduplication : ${unique.length}`);\nreturn [{ json: { profiles: unique, total: unique.length } }];"
+      },
+      "id": "da001111-0006-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Dédupliquer profils",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1360, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le prompt Claude pour évaluer les profils selon l'ICP SEA\nconst d = $input.item.json;\nconst profiles = d.profiles || [];\n\nconst systemPrompt = `Tu es un expert en qualification de prospects B2B pour des agences SEA et performance marketing françaises.\nÉvalue chaque profil LinkedIn selon les 5 critères ICP ci-dessous.\nRéponds UNIQUEMENT en JSON valide strict, sans markdown ni explication.\n\nCRITÈRES ICP SEA (un seul NON = ÉLIMINÉ immédiatement) :\nQ1 — Activité principale SEA/performance\n  OUI : Google Ads, Meta Ads, LinkedIn Ads, TikTok Ads, paid social, SEA, programmatique, acquisition payante\n  NON : agence full-service où SEA = secondaire, SEO pur, content pur, branding, social media organique\n\nQ2 — Taille agence : 8 à 40 salariés estimés\n  NON : freelance solo, micro-agence (<8 pers.), grande agence (>40 pers.)\n  Si taille inconnue : inclure avec note \"taille à vérifier\"\n\nQ3 — Décideur direct UNIQUEMENT\n  OUI : Fondateur, Co-fondateur, CEO, Président, DG, Directeur Général, Associé gérant\n  NON : Head of Growth, Directeur Marketing, Head of Paid, Manager, Chef de projet, salarié non-fondateur\n\nQ4 — Localisation : France uniquement\n  OUI : Paris (priorité), puis Lyon, Bordeaux, Nantes, Marseille, Lille, Toulouse, toutes villes FR\n  NON : Québec, Belgique, Maroc, Tunisie, autres pays\n\nQ5 — Pas d'agence IA/automation en interne\n  NON si : agence mentionne \"IA\", \"automation\", \"no-code\", \"n8n\", \"Make\", \"CRM automation\" comme offre client\n\nASSIGNATION DOULEUR AUTOMATIQUE :\n\"P-MON — Monitoring\" → agences Google Ads pure-play, Meta Ads, paid social (douleur principale : budget qui dérape)\n\"P08 — Reporting\" → agences multi-plateformes (Google + Meta + LinkedIn + TikTok) (douleur principale : reporting mensuel manuel)\n\nASSIGNATION LISTE :\n\"A-list\" → agence clairement SEA/performance, taille visible ≥10 pers., fondateur identifié\n\"B-list\" → agence probable SEA, taille incertaine, ou profil partiellement visible\n\nFORMAT OBLIGATOIRE — tableau JSON uniquement :\n[{\n  \"nom\": \"Prénom Nom\",\n  \"agence\": \"Nom Agence\",\n  \"linkedin_url\": \"https://linkedin.com/in/...\",\n  \"poste\": \"Fondateur & CEO\",\n  \"qualifie\": true,\n  \"raison_elimination\": null,\n  \"douleur_probable\": \"P-MON — Monitoring\",\n  \"liste\": \"A-list\"\n}]`;\n\nconst userContent = `Évalue ces ${profiles.length} profils LinkedIn :\\n${JSON.stringify(profiles, null, 2)}`;\n\nreturn [{ json: {\n  claude_body: JSON.stringify({\n    model: 'claude-sonnet-4-6',\n    max_tokens: 4000,\n    system: systemPrompt,\n    messages: [{ role: 'user', content: userContent }]\n  })\n}}];"
+      },
+      "id": "da001111-0007-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Construire prompt ICP SEA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.claude_body }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": { "id": "REMPLACER_ID_CREDENTIAL_CLAUDE", "name": "Claude API" }
+      },
+      "id": "da001111-0008-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Évaluer ICP (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1800, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse la réponse Claude et sépare qualifiés / éliminés\nconst response = $input.item.json;\nif (!response.content?.[0]?.text) {\n  throw new Error('Réponse Claude invalide : ' + JSON.stringify(response).substring(0, 200));\n}\n\nlet raw = response.content[0].text.trim();\n// Nettoyer les backticks si Claude les ajoute\nif (raw.startsWith('```')) {\n  raw = raw.replace(/```json?\\n?/g, '').replace(/```$/g, '').trim();\n}\n\nlet evaluated;\ntry {\n  evaluated = JSON.parse(raw);\n} catch (e) {\n  throw new Error('JSON invalide de Claude : ' + raw.substring(0, 300));\n}\n\nconst qualifies = evaluated.filter(p => p.qualifie === true);\nconst elimines = evaluated.filter(p => p.qualifie === false);\n\nconsole.log(`ICP SEA : ${qualifies.length} qualifiés / ${elimines.length} éliminés`);\nconsole.log('Éliminés :', elimines.map(p => `${p.nom} (${p.raison_elimination})`).join(', '));\n\nreturn [{ json: { qualifies, total_evalues: evaluated.length, total_qualifies: qualifies.length } }];"
+      },
+      "id": "da001111-0009-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Parser qualifiés ICP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2020, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convertit le tableau de qualifiés en items séparés\nconst d = $input.item.json;\nconst qualifies = d.qualifies || [];\n\nif (qualifies.length === 0) {\n  return [{ json: { message: 'Aucun prospect SEA qualifié cette session', total: 0 } }];\n}\n\nconsole.log(`${qualifies.length} prospects SEA qualifiés à insérer dans le CRM`);\nreturn qualifies.map(p => ({ json: p }));"
+      },
+      "id": "da001111-0010-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Éclater en items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "da001111-0011-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Boucle prospects",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [2460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prépare la query Notion pour vérifier si le prospect existe déjà\nconst p = $input.item.json;\nreturn [{ json: {\n  notion_query: JSON.stringify({\n    filter: {\n      or: [\n        { property: 'Nom', title: { contains: p.nom || '' } },\n        { property: 'LinkedIn', url: { contains: (p.linkedin_url || '').replace('https://www.', 'https://') } }\n      ]\n    },\n    page_size: 1\n  }),\n  prospect: p\n}}];"
+      },
+      "id": "da001111-0012-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Préparer query doublon",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/REMPLACER_PAR_ID_DB_NOTION/query",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REMPLACER_PAR_NOTION_TOKEN" },
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.notion_query }}"
+      },
+      "id": "da001111-0013-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Vérifier doublon Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-doublon-001",
+              "leftValue": "={{ $json.results.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "da001111-0014-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Pas doublon ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le body Notion qui correspond exactement au schéma du CRM Prospection LinkedIn\nconst p = $('Boucle prospects').item.json;\n\n// Notes avec contexte source\nconst notes = [\n  p.source ? `Source requête : ${p.source}` : '',\n  p.snippet ? p.snippet.substring(0, 300) : ''\n].filter(Boolean).join(' | ');\n\nreturn [{ json: {\n  notion_body: JSON.stringify({\n    parent: { database_id: 'REMPLACER_PAR_ID_DB_NOTION' },\n    properties: {\n      'Nom': {\n        title: [{ text: { content: p.nom || '' } }]\n      },\n      'Agence': {\n        rich_text: [{ text: { content: p.agence || '' } }]\n      },\n      'Rôle': {\n        rich_text: [{ text: { content: p.poste || '' } }]\n      },\n      'LinkedIn': {\n        url: p.linkedin_url || null\n      },\n      'Statut': {\n        select: { name: 'À envoyer' }\n      },\n      'Canal': {\n        select: { name: 'InMail' }\n      },\n      'Douleur': {\n        select: { name: p.douleur_probable || 'P-MON — Monitoring' }\n      },\n      'Liste': {\n        select: { name: p.liste || 'B-list' }\n      },\n      'Notes': {\n        rich_text: [{ text: { content: notes.substring(0, 1900) } }]\n      }\n    }\n  })\n}}];"
+      },
+      "id": "da001111-0015-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Construire page CRM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3340, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REMPLACER_PAR_NOTION_TOKEN" },
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.notion_body }}"
+      },
+      "id": "da001111-0016-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Créer dans CRM Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3560, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst ts = new Date().toISOString();\nconsole.log(`P-DISCOVERY-SEA terminé — ${ts}`);\nreturn [{ json: { status: 'done', timestamp: ts, message: 'Session Discovery SEA terminée. Vérifie le CRM Notion.' } }];"
+      },
+      "id": "da001111-0017-4aaa-9000-a1b2c3d4e5f6",
+      "name": "Log final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3780, 300]
+    }
+  ],
+  "connections": {
+    "Trigger Manuel": {
+      "main": [[{ "node": "Générer requêtes SEA", "type": "main", "index": 0 }]]
+    },
+    "Générer requêtes SEA": {
+      "main": [[{ "node": "Boucle requêtes", "type": "main", "index": 0 }]]
+    },
+    "Boucle requêtes": {
+      "main": [
+        [{ "node": "Chercher LinkedIn (Serper)", "type": "main", "index": 0 }],
+        [{ "node": "Dédupliquer profils", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chercher LinkedIn (Serper)": {
+      "main": [[{ "node": "Pause anti-spam", "type": "main", "index": 0 }]]
+    },
+    "Pause anti-spam": {
+      "main": [[{ "node": "Extraire et accumuler", "type": "main", "index": 0 }]]
+    },
+    "Extraire et accumuler": {
+      "main": [[{ "node": "Boucle requêtes", "type": "main", "index": 0 }]]
+    },
+    "Dédupliquer profils": {
+      "main": [[{ "node": "Construire prompt ICP SEA", "type": "main", "index": 0 }]]
+    },
+    "Construire prompt ICP SEA": {
+      "main": [[{ "node": "Évaluer ICP (Claude)", "type": "main", "index": 0 }]]
+    },
+    "Évaluer ICP (Claude)": {
+      "main": [[{ "node": "Parser qualifiés ICP", "type": "main", "index": 0 }]]
+    },
+    "Parser qualifiés ICP": {
+      "main": [[{ "node": "Éclater en items", "type": "main", "index": 0 }]]
+    },
+    "Éclater en items": {
+      "main": [[{ "node": "Boucle prospects", "type": "main", "index": 0 }]]
+    },
+    "Boucle prospects": {
+      "main": [
+        [{ "node": "Préparer query doublon", "type": "main", "index": 0 }],
+        [{ "node": "Log final", "type": "main", "index": 0 }]
+      ]
+    },
+    "Préparer query doublon": {
+      "main": [[{ "node": "Vérifier doublon Notion", "type": "main", "index": 0 }]]
+    },
+    "Vérifier doublon Notion": {
+      "main": [[{ "node": "Pas doublon ?", "type": "main", "index": 0 }]]
+    },
+    "Pas doublon ?": {
+      "main": [
+        [{ "node": "Construire page CRM", "type": "main", "index": 0 }],
+        [{ "node": "Boucle prospects", "type": "main", "index": 0 }]
+      ]
+    },
+    "Construire page CRM": {
+      "main": [[{ "node": "Créer dans CRM Notion", "type": "main", "index": 0 }]]
+    },
+    "Créer dans CRM Notion": {
+      "main": [[{ "node": "Boucle prospects", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "p-discovery-sea-v1",
+  "meta": { "templateCredsSetupCompleted": false }
+}

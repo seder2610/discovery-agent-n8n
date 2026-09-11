@@ -1,0 +1,300 @@
+{
+  "name": "Relance CRON — J+2 & J+5 (dates planifiées)",
+  "nodes": [
+    {
+      "id": "rc-config-001",
+      "name": "Config CRM",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-db",
+              "name": "notion_database_id",
+              "value": "ad2b7af7-d0a6-4cb9-a431-360b4c304bf6",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rc-cron-001",
+      "name": "⏰ CRON 8h Paris",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [460, 400],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rc-filter-j2-001",
+      "name": "📅 Filtre J+2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 260],
+      "parameters": {
+        "jsCode": "// J+2 : M1 déjà envoyé (Envoyé) et date planifiée J+2 atteinte\nconst today = new Date().toISOString().split('T')[0];\nconst dbId = $('Config CRM').item.json.notion_database_id;\n\nconst filterBody = {\n  filter: {\n    and: [\n      { property: 'Statut', select: { equals: 'Envoyé' } },\n      { property: 'Date J+2', date: { on_or_before: today } }\n    ]\n  },\n  page_size: 100\n};\n\nreturn [{ json: { today, dbId, filterBody: JSON.stringify(filterBody), branche: 'j2' } }];"
+      }
+    },
+    {
+      "id": "rc-query-j2-001",
+      "name": "🔍 Notion — À passer J+2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 260],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.dbId + '/query' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyType": "raw",
+        "body": "={{ $json.filterBody }}",
+        "options": { "timeout": 30000 }
+      },
+      "credentials": {
+        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rc-if-j2-001",
+      "name": "Résultats J+2 ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1120, 260],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "has-j2",
+              "leftValue": "={{ ($json.results || []).length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rc-split-j2-001",
+      "name": "🔀 Éclater J+2",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1340, 200],
+      "parameters": { "fieldToSplitOut": "results" }
+    },
+    {
+      "id": "rc-update-j2-001",
+      "name": "✅ → J+2 — À relancer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 200],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.notion.com/v1/pages/' + $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyType": "raw",
+        "body": "{\"properties\":{\"Statut\":{\"select\":{\"name\":\"J+2 — À relancer\"}}}}",
+        "options": {
+          "timeout": 30000,
+          "batching": { "batch": { "batchSize": 1, "batchInterval": 350 } }
+        }
+      },
+      "credentials": {
+        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+      }
+    },
+    {
+      "id": "rc-skip-j2-001",
+      "name": "Skip J+2 (aucun)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 320],
+      "parameters": {}
+    },
+    {
+      "id": "rc-filter-j5-001",
+      "name": "📅 Filtre J+5",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 540],
+      "parameters": {
+        "jsCode": "// J+5 : date planifiée atteinte + pas encore en file J+5\nconst today = new Date().toISOString().split('T')[0];\nconst dbId = $('Config CRM').item.json.notion_database_id;\n\nconst filterBody = {\n  filter: {\n    and: [\n      { property: 'Date J+5', date: { on_or_before: today } },\n      {\n        or: [\n          { property: 'Statut', select: { equals: 'Relance J+2 envoyée' } },\n          { property: 'Statut', select: { equals: 'J+2 — À relancer' } }\n        ]\n      }\n    ]\n  },\n  page_size: 100\n};\n\nreturn [{ json: { today, dbId, filterBody: JSON.stringify(filterBody), branche: 'j5' } }];"
+      }
+    },
+    {
+      "id": "rc-query-j5-001",
+      "name": "🔍 Notion — À passer J+5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 540],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $json.dbId + '/query' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyType": "raw",
+        "body": "={{ $json.filterBody }}",
+        "options": { "timeout": 30000 }
+      },
+      "credentials": {
+        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rc-if-j5-001",
+      "name": "Résultats J+5 ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1120, 540],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "has-j5",
+              "leftValue": "={{ ($json.results || []).length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rc-split-j5-001",
+      "name": "🔀 Éclater J+5",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1340, 480],
+      "parameters": { "fieldToSplitOut": "results" }
+    },
+    {
+      "id": "rc-update-j5-001",
+      "name": "✅ → J+5 — À relancer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 480],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.notion.com/v1/pages/' + $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyType": "raw",
+        "body": "{\"properties\":{\"Statut\":{\"select\":{\"name\":\"J+5 — À relancer\"}}}}",
+        "options": {
+          "timeout": 30000,
+          "batching": { "batch": { "batchSize": 1, "batchInterval": 350 } }
+        }
+      },
+      "credentials": {
+        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+      }
+    },
+    {
+      "id": "rc-skip-j5-001",
+      "name": "Skip J+5 (aucun)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 600],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "⏰ CRON 8h Paris": {
+      "main": [[{ "node": "Config CRM", "type": "main", "index": 0 }]]
+    },
+    "Config CRM": {
+      "main": [
+        [
+          { "node": "📅 Filtre J+2", "type": "main", "index": 0 },
+          { "node": "📅 Filtre J+5", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "📅 Filtre J+2": {
+      "main": [[{ "node": "🔍 Notion — À passer J+2", "type": "main", "index": 0 }]]
+    },
+    "🔍 Notion — À passer J+2": {
+      "main": [[{ "node": "Résultats J+2 ?", "type": "main", "index": 0 }]]
+    },
+    "Résultats J+2 ?": {
+      "main": [
+        [{ "node": "🔀 Éclater J+2", "type": "main", "index": 0 }],
+        [{ "node": "Skip J+2 (aucun)", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔀 Éclater J+2": {
+      "main": [[{ "node": "✅ → J+2 — À relancer", "type": "main", "index": 0 }]]
+    },
+    "📅 Filtre J+5": {
+      "main": [[{ "node": "🔍 Notion — À passer J+5", "type": "main", "index": 0 }]]
+    },
+    "🔍 Notion — À passer J+5": {
+      "main": [[{ "node": "Résultats J+5 ?", "type": "main", "index": 0 }]]
+    },
+    "Résultats J+5 ?": {
+      "main": [
+        [{ "node": "🔀 Éclater J+5", "type": "main", "index": 0 }],
+        [{ "node": "Skip J+5 (aucun)", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔀 Éclater J+5": {
+      "main": [[{ "node": "✅ → J+5 — À relancer", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "Europe/Paris" },
+  "meta": { "instanceId": "bos-sedera" }
+}

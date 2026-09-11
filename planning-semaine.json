@@ -1,0 +1,178 @@
+{
+  "name": "Planning Semaine — 10 prospects/jour ouvré",
+  "nodes": [
+    {
+      "id": "ps-trigger-001",
+      "name": "▶️ Lancer le planning",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 400],
+      "parameters": {}
+    },
+    {
+      "id": "ps-config-001",
+      "name": "Config planning",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-db",
+              "name": "notion_database_id",
+              "value": "ad2b7af7-d0a6-4cb9-a431-360b4c304bf6",
+              "type": "string"
+            },
+            {
+              "id": "cfg-par-jour",
+              "name": "prospects_par_jour",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "cfg-demarrage",
+              "name": "demarrer_aujourdhui_si_semaine",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ps-query-001",
+      "name": "🔍 Notion — À planifier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $('Config planning').item.json.notion_database_id + '/query' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyType": "raw",
+        "body": "{\n  \"filter\": {\n    \"and\": [\n      {\n        \"property\": \"Date envoi\",\n        \"date\": { \"is_empty\": true }\n      },\n      {\n        \"or\": [\n          { \"property\": \"Statut\", \"select\": { \"equals\": \"Qualifié\" } },\n          { \"property\": \"Statut\", \"select\": { \"equals\": \"Prêt à envoyer\" } },\n          { \"property\": \"Statut\", \"select\": { \"equals\": \"À relire\" } }\n        ]\n      }\n    ]\n  },\n  \"sorts\": [{ \"timestamp\": \"created_time\", \"direction\": \"ascending\" }],\n  \"page_size\": 100\n}",
+        "options": { "timeout": 30000 }
+      },
+      "credentials": {
+        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ps-assign-001",
+      "name": "📅 Assigner planning semaine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400],
+      "parameters": {
+        "jsCode": "const cfg = $('Config planning').item.json;\nconst parJour = cfg.prospects_par_jour || 10;\nconst allowToday = cfg.demarrer_aujourdhui_si_semaine !== false;\n\nfunction fmt(date) {\n  return date.toISOString().split('T')[0];\n}\n\nfunction getPlanningStart() {\n  const d = new Date();\n  d.setHours(0, 0, 0, 0);\n  const day = d.getDay(); // 0=Dim … 6=Sam\n  if (day === 0) {\n    d.setDate(d.getDate() + 1);\n    return d;\n  }\n  if (day === 6) {\n    d.setDate(d.getDate() + 2);\n    return d;\n  }\n  if (allowToday && day >= 1 && day <= 5) return d;\n  const daysUntilMonday = 8 - day;\n  d.setDate(d.getDate() + daysUntilMonday);\n  return d;\n}\n\nfunction addWorkingDays(baseDate, n) {\n  const d = new Date(baseDate);\n  let added = 0;\n  while (added < n) {\n    d.setDate(d.getDate() + 1);\n    const wd = d.getDay();\n    if (wd !== 0 && wd !== 6) added++;\n  }\n  return d;\n}\n\nconst results = $input.item.json.results || [];\n\nif (results.length === 0) {\n  return [{ json: { status: 'aucun_prospect', total: 0 } }];\n}\n\nconst start = getPlanningStart();\n\nreturn results.map((page, i) => {\n  const dayOffset = Math.floor(i / parJour);\n  const dateEnvoi = dayOffset === 0 ? new Date(start) : addWorkingDays(start, dayOffset);\n\n  const dateJ2 = new Date(dateEnvoi);\n  dateJ2.setDate(dateEnvoi.getDate() + 2);\n\n  const dateJ5 = new Date(dateEnvoi);\n  dateJ5.setDate(dateEnvoi.getDate() + 5);\n\n  const nom =\n    page.properties?.Nom?.title?.[0]?.plain_text ||\n    page.properties?.Name?.title?.[0]?.plain_text ||\n    'Prospect';\n\n  const jours = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];\n\n  return {\n    json: {\n      id: page.id,\n      nom,\n      date_envoi: fmt(dateEnvoi),\n      date_j2: fmt(dateJ2),\n      date_j5: fmt(dateJ5),\n      slot: (i % parJour) + 1,\n      jour_label: jours[dateEnvoi.getDay()],\n      jour_numero: dayOffset + 1\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "ps-if-001",
+      "name": "À planifier ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1120, 400],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "has-rows",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "exists", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ps-patch-001",
+      "name": "✅ Notion — Planifier prospect",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 340],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.notion.com/v1/pages/' + $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyType": "raw",
+        "body": "={{ JSON.stringify({ properties: { 'Date envoi': { date: { start: $json.date_envoi } }, 'Date J+2': { date: { start: $json.date_j2 } }, 'Date J+5': { date: { start: $json.date_j5 } } } }) }}",
+        "options": {
+          "timeout": 30000,
+          "batching": { "batch": { "batchSize": 1, "batchInterval": 300 } }
+        }
+      },
+      "credentials": {
+        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+      }
+    },
+    {
+      "id": "ps-empty-001",
+      "name": "Fin — rien à planifier",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1340, 480],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg",
+              "name": "message",
+              "value": "Aucun prospect Prêt à envoyer sans date — rien à planifier.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "▶️ Lancer le planning": {
+      "main": [[{ "node": "Config planning", "type": "main", "index": 0 }]]
+    },
+    "Config planning": {
+      "main": [[{ "node": "🔍 Notion — À planifier", "type": "main", "index": 0 }]]
+    },
+    "🔍 Notion — À planifier": {
+      "main": [[{ "node": "📅 Assigner planning semaine", "type": "main", "index": 0 }]]
+    },
+    "📅 Assigner planning semaine": {
+      "main": [[{ "node": "À planifier ?", "type": "main", "index": 0 }]]
+    },
+    "À planifier ?": {
+      "main": [
+        [{ "node": "✅ Notion — Planifier prospect", "type": "main", "index": 0 }],
+        [{ "node": "Fin — rien à planifier", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "Europe/Paris" },
+  "meta": { "instanceId": "bos-sedera" }
+}
