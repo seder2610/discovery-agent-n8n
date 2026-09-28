@@ -1,6 +1,6 @@
 # Stack prospection SEA — 3 workflows n8n
 
-> Base Notion CRM : `ad2b7af7-d0a6-4cb9-a431-360b4c304bf6`  
+> Base Notion CRM : `REMPLACER_PAR_ID_BASE_NOTION`  
 > **Ton job** : générer les messages (Claude à la demande) → envoyer LinkedIn → statut **Envoyé**.  
 > **Automatique** : dates (Planning) + files relance J+2/J+5 (CRON).
 
