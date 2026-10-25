@@ -11,7 +11,7 @@ Vue filtrée : **Statut = Qualifié**.
 Copie pour chaque prospect : Nom, Agence, Rôle, Douleur, (optionnel : snippet Notes)
 
 ```
-1. Jean Dupont | Agence X | Fondateur | Monitoring
+1. Jean Dupont | Agence X | Fondateur | P-MON — Monitoring
 2. ...
 ```
 
@@ -78,7 +78,7 @@ Pour chaque fiche Notion :
 
 | Douleur | Ce que tu règles | Accroche typique |
 |---------|-----------------|------------------|
-| **Monitoring** | Budget Ads qui brûle le week-end sans alerte | "Tes comptes Google Ads — qui les surveille le samedi soir ?" |
+| **P-MON — Monitoring** | Budget Ads qui brûle le week-end sans alerte | "Tes comptes Google Ads — qui les surveille le samedi soir ?" |
 | **P08 — Reporting** | 5h/mois sur des rapports que personne ne lit | "Tes rapports clients, tu les fais encore à la main ?" |
 | **P-ONB — Onboarding** | L'arrivée d'un nouveau client = chaos manuel | "L'onboarding de ton dernier client, ça a pris combien de jours ?" |
 | **P11 — Coordination** | Emails en boucle entre chef de projet, client, équipe | "Combien d'emails pour synchroniser ton équipe sur un seul client ?" |

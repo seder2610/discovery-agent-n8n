@@ -30,7 +30,7 @@ Le dépôt ne contient pas d'exécution réelle. Voici la **structure d'une fich
 |---|---|
 | `Agence`, `Rôle`, `LinkedIn` | issus du profil trouvé par Serper |
 | `Canal` | `InMail` (valeur fixe) |
-| `Douleur` | `Monitoring` ou `Reporting` selon l'évaluation ICP (valeurs de select définies dans le prompt) |
+| `Douleur` | `P-MON — Monitoring` (agence pure Google/Meta/paid social : alertes et suivi de budget) ou `P08 — Reporting` (multi-plateformes : reporting client), selon l'évaluation ICP |
 | `Liste` | `A-list` ou `B-list` |
 | `Notes` | source et extrait du résultat de recherche |
 | `Statut` | `Qualifié` |
@@ -91,11 +91,11 @@ flowchart LR
 | `Date envoi`, `Date J+2`, `Date J+5` | Date | écrit par le planning, lu par la relance |
 | `Message` | Texte | rempli à la main avec le prompt batch (non utilisé par les workflows) |
 
-Les options de `Douleur` (`Monitoring`, `Reporting`) et de `Statut` doivent exister dans la base : l'API Notion refuse une option inconnue pour un Select.
+Les options de `Douleur` (`P-MON — Monitoring`, `P08 — Reporting`) et de `Statut` doivent exister dans la base : l'API Notion refuse une option inconnue pour un Select.
 
 ## Statut et limites
 
-- **Statut : base de départ, utilisée par l'auteur comme CRM de prospection** (pas de preuve d'exécution versionnée dans ce dépôt).
+- **Statut : base de départ.** Aucune exécution documentée dans ce dépôt (pas de journal ni de capture).
 - La découverte n'écrit pas la propriété de titre (`Nom`) ; le planning la lit. À compléter dans le nœud de création si besoin.
 - Le cron est `0 6 * * 1-5` avec le fuseau `Europe/Paris` : il s'exécute à 6 h, alors que le nom du nœud indique « 8h Paris ».
 - Les messages sont rédigés hors n8n par choix ; le prompt batch est écrit pour l'auteur (nom, positionnement, prix de départ) et doit être adapté.
