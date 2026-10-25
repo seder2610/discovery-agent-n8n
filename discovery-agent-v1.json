@@ -37,7 +37,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-API-KEY", "value": "REMPLACER_PAR_CLE_SERPER" },
+            { "name": "X-API-KEY", "value": "<YOUR_SERPER_API_KEY>" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -111,7 +111,7 @@
         "body": "={{ $json.claude_body }}"
       },
       "credentials": {
-        "httpHeaderAuth": { "id": "REMPLACER_ID_CREDENTIAL_CLAUDE", "name": "Claude API" }
+        "httpHeaderAuth": { "id": "<YOUR_ANTHROPIC_CREDENTIAL_ID>", "name": "Claude API" }
       },
       "id": "da001111-0008-4aaa-9000-a1b2c3d4e5f6",
       "name": "Évaluer ICP (Claude)",
@@ -163,11 +163,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.notion.com/v1/databases/REMPLACER_PAR_ID_DB_NOTION/query",
+        "url": "https://api.notion.com/v1/databases/<YOUR_NOTION_DATABASE_ID>/query",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer REMPLACER_PAR_NOTION_TOKEN" },
+            { "name": "Authorization", "value": "Bearer <YOUR_NOTION_TOKEN>" },
             { "name": "Notion-Version", "value": "2022-06-28" },
             { "name": "Content-Type", "value": "application/json" }
           ]
@@ -206,7 +206,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Construit le body Notion qui correspond exactement au schéma du CRM Prospection LinkedIn\nconst p = $('Boucle prospects').item.json;\n\n// Notes avec contexte source\nconst notes = [\n  p.source ? `Source requête : ${p.source}` : '',\n  p.snippet ? p.snippet.substring(0, 300) : ''\n].filter(Boolean).join(' | ');\n\nreturn [{ json: {\n  notion_body: JSON.stringify({\n    parent: { database_id: 'REMPLACER_PAR_ID_DB_NOTION' },\n    properties: {\n      'Nom': {\n        title: [{ text: { content: p.nom || '' } }]\n      },\n      'Agence': {\n        rich_text: [{ text: { content: p.agence || '' } }]\n      },\n      'Rôle': {\n        rich_text: [{ text: { content: p.poste || '' } }]\n      },\n      'LinkedIn': {\n        url: p.linkedin_url || null\n      },\n      'Statut': {\n        select: { name: 'À envoyer' }\n      },\n      'Canal': {\n        select: { name: 'InMail' }\n      },\n      'Douleur': {\n        select: { name: p.douleur_probable || 'P-MON — Monitoring' }\n      },\n      'Liste': {\n        select: { name: p.liste || 'B-list' }\n      },\n      'Notes': {\n        rich_text: [{ text: { content: notes.substring(0, 1900) } }]\n      }\n    }\n  })\n}}];"
+        "jsCode": "// Construit le body Notion qui correspond exactement au schéma du CRM Prospection LinkedIn\nconst p = $('Boucle prospects').item.json;\n\n// Notes avec contexte source\nconst notes = [\n  p.source ? `Source requête : ${p.source}` : '',\n  p.snippet ? p.snippet.substring(0, 300) : ''\n].filter(Boolean).join(' | ');\n\nreturn [{ json: {\n  notion_body: JSON.stringify({\n    parent: { database_id: '<YOUR_NOTION_DATABASE_ID>' },\n    properties: {\n      'Nom': {\n        title: [{ text: { content: p.nom || '' } }]\n      },\n      'Agence': {\n        rich_text: [{ text: { content: p.agence || '' } }]\n      },\n      'Rôle': {\n        rich_text: [{ text: { content: p.poste || '' } }]\n      },\n      'LinkedIn': {\n        url: p.linkedin_url || null\n      },\n      'Statut': {\n        select: { name: 'À envoyer' }\n      },\n      'Canal': {\n        select: { name: 'InMail' }\n      },\n      'Douleur': {\n        select: { name: p.douleur_probable || 'P-MON — Monitoring' }\n      },\n      'Liste': {\n        select: { name: p.liste || 'B-list' }\n      },\n      'Notes': {\n        rich_text: [{ text: { content: notes.substring(0, 1900) } }]\n      }\n    }\n  })\n}}];"
       },
       "id": "da001111-0015-4aaa-9000-a1b2c3d4e5f6",
       "name": "Construire page CRM",
@@ -221,7 +221,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer REMPLACER_PAR_NOTION_TOKEN" },
+            { "name": "Authorization", "value": "Bearer <YOUR_NOTION_TOKEN>" },
             { "name": "Notion-Version", "value": "2022-06-28" },
             { "name": "Content-Type", "value": "application/json" }
           ]

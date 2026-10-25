@@ -34,7 +34,7 @@
             {
               "id": "cfg-db",
               "name": "notion_database_id",
-              "value": "ad2b7af7-d0a6-4cb9-a431-360b4c304bf6",
+              "value": "<YOUR_NOTION_DATABASE_ID>",
               "type": "string"
             }
           ]
@@ -87,7 +87,7 @@
         }
       },
       "credentials": {
-        "httpHeaderAuth": { "id": "REMPLACER_ID_CREDENTIAL_SERPER", "name": "Serper API Key" }
+        "httpHeaderAuth": { "id": "<YOUR_SERPER_CREDENTIAL_ID>", "name": "Serper API Key" }
       },
       "id": "da002222-0004-4aaa-9000-a1b2c3d4e5f6",
       "name": "Chercher LinkedIn (Serper)",
@@ -179,7 +179,7 @@
         }
       },
       "credentials": {
-        "httpHeaderAuth": { "id": "REMPLACER_ID_CREDENTIAL_CLAUDE", "name": "Claude API Key" }
+        "httpHeaderAuth": { "id": "<YOUR_ANTHROPIC_CREDENTIAL_ID>", "name": "Claude API Key" }
       },
       "id": "da002222-0008-4aaa-9000-a1b2c3d4e5f6",
       "name": "Évaluer ICP (Claude)",
@@ -263,7 +263,7 @@
         "options": { "alwaysOutputData": true }
       },
       "credentials": {
-        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+        "notionApi": { "id": "<YOUR_NOTION_CREDENTIAL_ID>", "name": "Notion account" }
       },
       "id": "da002222-0012-4aaa-9000-a1b2c3d4e5f6",
       "name": "Notion — Chercher doublon",
@@ -331,7 +331,7 @@
         "options": {}
       },
       "credentials": {
-        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+        "notionApi": { "id": "<YOUR_NOTION_CREDENTIAL_ID>", "name": "Notion account" }
       },
       "id": "da002222-0014-4aaa-9000-a1b2c3d4e5f6",
       "name": "Notion — Créer prospect",

@@ -13,7 +13,7 @@
             {
               "id": "cfg-db",
               "name": "notion_database_id",
-              "value": "ad2b7af7-d0a6-4cb9-a431-360b4c304bf6",
+              "value": "<YOUR_NOTION_DATABASE_ID>",
               "type": "string"
             }
           ]
@@ -72,7 +72,7 @@
         "options": { "timeout": 30000 }
       },
       "credentials": {
-        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+        "notionApi": { "id": "<YOUR_NOTION_CREDENTIAL_ID>", "name": "Notion account" }
       },
       "onError": "continueRegularOutput"
     },
@@ -133,7 +133,7 @@
         }
       },
       "credentials": {
-        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+        "notionApi": { "id": "<YOUR_NOTION_CREDENTIAL_ID>", "name": "Notion account" }
       }
     },
     {
@@ -178,7 +178,7 @@
         "options": { "timeout": 30000 }
       },
       "credentials": {
-        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+        "notionApi": { "id": "<YOUR_NOTION_CREDENTIAL_ID>", "name": "Notion account" }
       },
       "onError": "continueRegularOutput"
     },
@@ -239,7 +239,7 @@
         }
       },
       "credentials": {
-        "notionApi": { "id": "REMPLACER_ID_NOTION_CREDENTIAL", "name": "Notion account" }
+        "notionApi": { "id": "<YOUR_NOTION_CREDENTIAL_ID>", "name": "Notion account" }
       }
     },
     {
@@ -296,5 +296,5 @@
   },
   "active": false,
   "settings": { "executionOrder": "v1", "timezone": "Europe/Paris" },
-  "meta": { "instanceId": "bos-sedera" }
+  "meta": {}
 }
